@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+src/__pycache__/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Data files (user-provided, not tracked)
+data/topo/*.npy
+data/labels.csv
+
+# Model checkpoints (large binary files)
+checkpoints/*.pt
+checkpoints/norm_stats.json
+checkpoints/training_history.npz
+
+# Results
+results/*.png
+results/*.txt
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
