@@ -30,6 +30,8 @@ from src.config import (
     BATCH_SIZE,
     CHECKPOINT_DIR,
     DROPOUT,
+    GLOBAL_FEATURE_COLUMNS,
+    GLOBAL_MLP_DIM,
     HIDDEN_DIM,
     NUM_LAYERS,
     RESULTS_DIR,
@@ -68,15 +70,20 @@ def load_model(checkpoint_path: str, device: torch.device) -> HeteroGNN:
 
     # Recover architecture dimensions from the checkpoint metadata
     point_in_dim = ckpt["point_in_dim"]
+    edge_in_dim = ckpt.get("edge_in_dim", 2)
     face_in_dim = ckpt["face_in_dim"]
+    global_feature_dim = ckpt.get("global_feature_dim", len(GLOBAL_FEATURE_COLUMNS))
     train_args = ckpt.get("args", {})
 
     model = HeteroGNN(
         point_in_dim=point_in_dim,
         face_in_dim=face_in_dim,
+        edge_in_dim=edge_in_dim,
+        global_feature_dim=global_feature_dim,
         hidden_dim=train_args.get("hidden_dim", HIDDEN_DIM),
         num_layers=train_args.get("num_layers", NUM_LAYERS),
         dropout=train_args.get("dropout", DROPOUT),
+        global_mlp_dim=GLOBAL_MLP_DIM,
     ).to(device)
 
     model.load_state_dict(ckpt["model_state_dict"])
@@ -97,7 +104,7 @@ def run_inference(model, loader, norm_stats, device):
     with torch.no_grad():
         for batch in loader:
             batch = batch.to(device)
-            pred = model(batch).squeeze(-1).cpu().numpy()
+            pred = model(batch, batch.global_features).squeeze(-1).cpu().numpy()
             true = batch.y.squeeze(-1).cpu().numpy()
 
             pred_orig = denormalize(pred, norm_stats["drop_mean"], norm_stats["drop_std"])
