@@ -48,3 +48,27 @@ SEED = 42              # Global random seed for reproducibility
 LR_FACTOR = 0.5        # Factor by which the LR is reduced on plateau
 LR_PATIENCE = 15       # Epochs to wait before reducing LR
 LR_MIN = 1e-6          # Minimum learning rate
+
+# ---------------------------------------------------------------------------
+# Physics / global features
+# ---------------------------------------------------------------------------
+# CSV columns used as graph-level (global) physics/geometry features
+GLOBAL_FEATURE_COLUMNS = [
+    "chang",        # channel length (m)
+    "kuan",         # channel width (m)
+    "shen",         # channel depth (m)
+    "hanjiemian",   # cross-sectional area (m²)
+    "liudao",       # flow path count
+    "liuliang",     # flow rate (m³/s)
+    "midu",         # fluid density (kg/m³)
+    "niandu",       # dynamic viscosity (Pa·s)
+    "ceng",         # number of layers
+    "z_cut",        # z-direction cut position (m)
+    "in_v",         # inlet velocity (m/s)
+    "in_p",         # inlet pressure (Pa)
+    "length",       # overall length (m)
+    "board_length", # board/plate length (m)
+]
+
+# Hidden dimension for the physics-parameter MLP subnet
+GLOBAL_MLP_DIM = 64
