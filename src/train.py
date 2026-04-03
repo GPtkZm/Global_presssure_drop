@@ -32,6 +32,8 @@ from src.config import (
     CHECKPOINT_DIR,
     DROPOUT,
     EPOCHS,
+    GLOBAL_FEATURE_COLUMNS,
+    GLOBAL_MLP_DIM,
     HIDDEN_DIM,
     LR,
     LR_FACTOR,
@@ -81,7 +83,7 @@ def evaluate_split(model, loader, criterion, device, norm_stats):
     with torch.no_grad():
         for batch in loader:
             batch = batch.to(device)
-            pred = model(batch).squeeze(-1)   # (B,)
+            pred = model(batch, batch.global_features).squeeze(-1)   # (B,)
             y = batch.y.squeeze(-1)           # (B,)
             loss = criterion(pred, y)
             total_loss += loss.item() * len(y)
@@ -154,15 +156,19 @@ def main():
     sample = train_dataset[0]
     point_in_dim = sample["point"].x.shape[1]
     face_in_dim = sample["face"].x.shape[1]
-    print(f"  point_in_dim={point_in_dim}  face_in_dim={face_in_dim}")
+    edge_in_dim = sample["edge"].x.shape[1]
+    print(f"  point_in_dim={point_in_dim}  edge_in_dim={edge_in_dim}  face_in_dim={face_in_dim}")
 
     # ---- Model, optimiser, scheduler, loss --------------------------------
     model = HeteroGNN(
         point_in_dim=point_in_dim,
         face_in_dim=face_in_dim,
+        edge_in_dim=edge_in_dim,
+        global_feature_dim=len(GLOBAL_FEATURE_COLUMNS),
         hidden_dim=args.hidden_dim,
         num_layers=args.num_layers,
         dropout=args.dropout,
+        global_mlp_dim=GLOBAL_MLP_DIM,
     ).to(device)
 
     num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -196,7 +202,7 @@ def main():
         for batch in tqdm(train_loader, desc=f"Epoch {epoch:03d}", leave=False):
             batch = batch.to(device)
             optimizer.zero_grad()
-            pred = model(batch).squeeze(-1)    # (B,)
+            pred = model(batch, batch.global_features).squeeze(-1)    # (B,)
             y = batch.y.squeeze(-1)            # (B,)
             loss = criterion(pred, y)
             loss.backward()
@@ -249,7 +255,9 @@ def main():
                     "val_loss": val_loss,
                     "args": vars(args),
                     "point_in_dim": point_in_dim,
+                    "edge_in_dim": edge_in_dim,
                     "face_in_dim": face_in_dim,
+                    "global_feature_dim": len(GLOBAL_FEATURE_COLUMNS),
                     "num_face_types": train_dataset.num_face_types,
                 },
                 checkpoint_path,
