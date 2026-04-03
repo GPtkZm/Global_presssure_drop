@@ -83,10 +83,10 @@ def evaluate_split(model, loader, criterion, device, norm_stats):
     with torch.no_grad():
         for batch in loader:
             batch = batch.to(device)
-            pred = model(batch, batch.global_features).squeeze(-1)   # (B,)
-            y = batch.y.squeeze(-1)           # (B,)
+            pred = model(batch, batch.global_features).view(-1)   # (B,)
+            y = batch.y.view(-1)           # (B,)
             loss = criterion(pred, y)
-            total_loss += loss.item() * len(y)
+            total_loss += loss.item() * y.shape[0]
 
             # Store de-normalised values for metric computation
             pred_np = denormalize(
@@ -102,7 +102,7 @@ def evaluate_split(model, loader, criterion, device, norm_stats):
             all_pred.append(pred_np)
             all_true.append(true_np)
 
-    n = sum(len(p) for p in all_pred)
+    n = sum(p.size for p in all_pred)
     avg_loss = total_loss / n
     y_pred = np.concatenate(all_pred)
     y_true = np.concatenate(all_true)
@@ -202,15 +202,15 @@ def main():
         for batch in tqdm(train_loader, desc=f"Epoch {epoch:03d}", leave=False):
             batch = batch.to(device)
             optimizer.zero_grad()
-            pred = model(batch, batch.global_features).squeeze(-1)    # (B,)
-            y = batch.y.squeeze(-1)            # (B,)
+            pred = model(batch, batch.global_features).view(-1)    # (B,)
+            y = batch.y.view(-1)            # (B,)
             loss = criterion(pred, y)
             loss.backward()
             # Gradient clipping to prevent exploding gradients
             nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
             optimizer.step()
-            total_train_loss += loss.item() * len(y)
-            num_train += len(y)
+            total_train_loss += loss.item() * y.shape[0]
+            num_train += y.shape[0]
 
         train_loss = total_train_loss / num_train
 

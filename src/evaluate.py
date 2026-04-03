@@ -104,8 +104,8 @@ def run_inference(model, loader, norm_stats, device):
     with torch.no_grad():
         for batch in loader:
             batch = batch.to(device)
-            pred = model(batch, batch.global_features).squeeze(-1).cpu().numpy()
-            true = batch.y.squeeze(-1).cpu().numpy()
+            pred = model(batch, batch.global_features).view(-1).cpu().numpy()
+            true = batch.y.view(-1).cpu().numpy()
 
             pred_orig = denormalize(pred, norm_stats["drop_mean"], norm_stats["drop_std"])
             true_orig = denormalize(true, norm_stats["drop_mean"], norm_stats["drop_std"])
