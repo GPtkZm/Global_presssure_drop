@@ -62,7 +62,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def load_model_from_checkpoint(checkpoint_path: str, device: torch.device):
+def load_model_from_checkpoint(checkpoint_path: str, device: torch.device) -> torch.nn.Module:
     """Load the model from a checkpoint file using the saved model_cfg."""
     ckpt = torch.load(checkpoint_path, map_location=device)
 
