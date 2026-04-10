@@ -27,11 +27,27 @@ CHECKPOINT_DIR = os.path.join(ROOT_DIR, "checkpoints")
 RESULTS_DIR = os.path.join(ROOT_DIR, "results")
 
 # ---------------------------------------------------------------------------
-# Model hyperparameters
+# Model selection
+# ---------------------------------------------------------------------------
+# Choose which model to use: "heterognn" or "transformer"
+MODEL_TYPE = "heterognn"
+
+# ---------------------------------------------------------------------------
+# Model hyperparameters — HeteroGNN
 # ---------------------------------------------------------------------------
 HIDDEN_DIM = 128       # Width of all hidden layers
 NUM_LAYERS = 6         # Number of heterogeneous message-passing layers
 DROPOUT = 0.1          # Dropout probability in the decoder MLP
+
+# ---------------------------------------------------------------------------
+# Model hyperparameters — Transformer
+# ---------------------------------------------------------------------------
+TRANSFORMER_D_MODEL = 256      # Transformer model dimension
+TRANSFORMER_NHEAD = 8          # Number of attention heads
+TRANSFORMER_NUM_ENCODER_LAYERS = 4   # Number of TransformerEncoder layers
+TRANSFORMER_DIM_FEEDFORWARD = 512    # Feedforward dimension inside transformer
+TRANSFORMER_DROPOUT = 0.1      # Dropout in transformer
+TRANSFORMER_POOL = "mean"      # Pooling strategy: "mean" or "max"
 
 # ---------------------------------------------------------------------------
 # Training hyperparameters
@@ -39,7 +55,7 @@ DROPOUT = 0.1          # Dropout probability in the decoder MLP
 LR = 1e-3              # Initial learning rate for Adam
 EPOCHS = 300           # Maximum number of training epochs
 BATCH_SIZE = 16        # Number of graphs per mini-batch
-PATIENCE = 30          # Early-stopping patience (epochs without val improvement)
+PATIENCE = 30          # Early-stopping patience (epochs without test improvement)
 SEED = 42              # Global random seed for reproducibility
 
 # ---------------------------------------------------------------------------
@@ -72,3 +88,11 @@ GLOBAL_FEATURE_COLUMNS = [
 
 # Hidden dimension for the physics-parameter MLP subnet
 GLOBAL_MLP_DIM = 64
+
+# ---------------------------------------------------------------------------
+# Distributed training (DDP)
+# ---------------------------------------------------------------------------
+# Set USE_DDP=True to enable multi-GPU training with DistributedDataParallel.
+# Launch with: torchrun --nproc_per_node=<NUM_GPUS> main.py
+USE_DDP = False        # Enable DistributedDataParallel training
+NUM_GPUS = 4           # Number of GPUs to use when USE_DDP=True
