@@ -28,8 +28,6 @@ Compatibility
 Accepts the same ``HeteroData`` objects produced by ``PressureDropDataset``.
 """
 
-import math
-
 import torch
 import torch.nn as nn
 from torch_geometric.nn import global_mean_pool, global_max_pool
@@ -167,21 +165,24 @@ class TransformerPressureDrop(nn.Module):
         num_graphs = int(data["point"].batch.max().item()) + 1
 
         # ---- Project each node type to d_model ---------------------------
-        h_point = self.point_proj(data["point"].x) + self.type_embed(
-            torch.zeros(data["point"].x.shape[0], dtype=torch.long, device=data["point"].x.device)
-        )
-        h_face = self.face_proj(data["face"].x) + self.type_embed(
-            torch.ones(data["face"].x.shape[0], dtype=torch.long, device=data["face"].x.device)
-        )
+        # Use new_zeros / new_full to create index tensors on the correct device
+        # without a separate allocation step.
+        point_x = data["point"].x
+        face_x = data["face"].x
         h_edge_nodes = data["edge"].x
+
+        h_point = self.point_proj(point_x) + self.type_embed(
+            point_x.new_zeros(point_x.shape[0], dtype=torch.long)
+        )
+        h_face = self.face_proj(face_x) + self.type_embed(
+            face_x.new_ones(face_x.shape[0], dtype=torch.long)
+        )
         if h_edge_nodes.shape[0] > 0:
             h_edge = self.edge_proj(h_edge_nodes) + self.type_embed(
-                torch.full(
-                    (h_edge_nodes.shape[0],), 2, dtype=torch.long, device=h_edge_nodes.device
-                )
+                h_edge_nodes.new_full((h_edge_nodes.shape[0],), 2, dtype=torch.long)
             )
         else:
-            h_edge = torch.zeros(0, self.d_model, device=data["point"].x.device)
+            h_edge = torch.zeros(0, self.d_model, device=point_x.device)
 
         # ---- Pool each node type to graph level --------------------------
         g_point = self._pool_nodes(h_point, data["point"].batch, num_graphs)  # (B, d_model)

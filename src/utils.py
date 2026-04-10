@@ -118,7 +118,11 @@ def mse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
 
 def mre(y_true: np.ndarray, y_pred: np.ndarray, eps: float = _EPS) -> float:
-    """Mean Relative Error (same as MAPE, in percent)."""
+    """Mean Relative Error in percent.
+
+    Equivalent to MAPE: mean(|y_true - y_pred| / |y_true|) * 100.
+    Returns a percentage value (e.g. 5.3 means 5.3%).
+    """
     return float(np.mean(np.abs((y_true - y_pred) / (np.abs(y_true) + eps))) * 100)
 
 

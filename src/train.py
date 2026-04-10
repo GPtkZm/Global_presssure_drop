@@ -87,6 +87,11 @@ def is_main_process():
     return True
 
 
+def get_raw_model(model):
+    """Unwrap DDP to get the underlying module."""
+    return model.module if isinstance(model, DDP) else model
+
+
 def evaluate_split(model, loader, criterion, device, norm_stats):
     """Run one full pass over *loader* and return loss + all metrics (de-normalised).
 
@@ -95,7 +100,7 @@ def evaluate_split(model, loader, criterion, device, norm_stats):
     tuple : (avg_loss, metrics_dict)  – metrics on the original scale
     """
     # Unwrap DDP for inference
-    raw_model = model.module if isinstance(model, DDP) else model
+    raw_model = get_raw_model(model)
     raw_model.eval()
     total_loss = 0.0
     all_pred, all_true = [], []
@@ -131,7 +136,7 @@ def evaluate_split(model, loader, criterion, device, norm_stats):
 
 def evaluate_split_with_ids(model, loader, norm_stats, device, case_ids):
     """Run inference and return per-sample (id, true, pred) triples."""
-    raw_model = model.module if isinstance(model, DDP) else model
+    raw_model = get_raw_model(model)
     raw_model.eval()
     all_ids = []
     all_true = []
@@ -227,7 +232,7 @@ def main():
     if is_main_process():
         print(f"Using device: {device}  |  DDP: {use_ddp}  |  Model: {args.model_type}")
 
-    set_seed(args.seed + (dist.get_rank() if use_ddp else 0))
+    set_seed(args.seed)
     os.makedirs(CHECKPOINT_DIR, exist_ok=True)
     os.makedirs(RESULTS_DIR, exist_ok=True)
 
@@ -293,7 +298,7 @@ def main():
         model = DDP(model, device_ids=[local_rank])
 
     if is_main_process():
-        raw = model.module if isinstance(model, DDP) else model
+        raw_model = get_raw_model(model)
         num_params = sum(p.numel() for p in raw.parameters() if p.requires_grad)
         print(f"  model parameters: {num_params:,}")
 
@@ -334,7 +339,7 @@ def main():
         ):
             batch = batch.to(device)
             optimizer.zero_grad()
-            raw_model = model.module if isinstance(model, DDP) else model
+            raw_model = get_raw_model(model)
             pred = raw_model(batch, batch.global_features).view(-1)
             y = batch.y.view(-1)
             loss = criterion(pred, y)
@@ -399,7 +404,7 @@ def main():
             if test_loss < best_test_loss:
                 best_test_loss = test_loss
                 patience_counter = 0
-                raw_model = model.module if isinstance(model, DDP) else model
+                raw_model = get_raw_model(model)
                 torch.save(
                     {
                         "epoch": epoch,
@@ -449,7 +454,7 @@ def main():
     if is_main_process():
         print("\nLoading best checkpoint for final test evaluation …")
         ckpt = torch.load(checkpoint_path, map_location=device)
-        raw_model = model.module if isinstance(model, DDP) else model
+        raw_model = get_raw_model(model)
         raw_model.load_state_dict(ckpt["model_state_dict"])
 
         _, final_test_metrics = evaluate_split(

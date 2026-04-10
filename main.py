@@ -21,7 +21,8 @@ Usage
 DDP (multi-GPU)
 ~~~~~~~~~~~~~~~
   Set USE_DDP=True and NUM_GPUS=4 in src/config.py, then run:
-    torchrun --nproc_per_node=4 main.py
+    torchrun --nproc_per_node=4 -m src.train
+  (main.py is intended for single-process orchestration only)
 """
 
 import argparse
@@ -93,40 +94,27 @@ def check_splits(df):
 
 
 def run_train(args):
-    """Run training."""
-    from src.config import MODEL_TYPE, USE_DDP, NUM_GPUS
+    """Run training (single-process mode via src.train).
 
+    For multi-GPU DDP training, use torchrun directly:
+      torchrun --nproc_per_node=<NUM_GPUS> -m src.train [flags]
+    """
     print("\n" + "=" * 60)
     print("Step 3: Training")
     print("=" * 60)
 
-    base_cmd = sys.executable
-    if USE_DDP:
-        cmd = (
-            f"torchrun --nproc_per_node={NUM_GPUS} main.py"
-            f" --epochs {args.epochs}"
-            f" --batch_size {args.batch_size}"
-            f" --lr {args.lr}"
-            f" --hidden_dim {args.hidden_dim}"
-            f" --num_layers {args.num_layers}"
-            f" --dropout {args.dropout}"
-            f" --patience {args.patience}"
-            f" --seed {args.seed}"
-            f" --model_type {args.model_type}"
-        )
-    else:
-        cmd = (
-            f"{base_cmd} -m src.train"
-            f" --epochs {args.epochs}"
-            f" --batch_size {args.batch_size}"
-            f" --lr {args.lr}"
-            f" --hidden_dim {args.hidden_dim}"
-            f" --num_layers {args.num_layers}"
-            f" --dropout {args.dropout}"
-            f" --patience {args.patience}"
-            f" --seed {args.seed}"
-            f" --model_type {args.model_type}"
-        )
+    train_flags = (
+        f" --epochs {args.epochs}"
+        f" --batch_size {args.batch_size}"
+        f" --lr {args.lr}"
+        f" --hidden_dim {args.hidden_dim}"
+        f" --num_layers {args.num_layers}"
+        f" --dropout {args.dropout}"
+        f" --patience {args.patience}"
+        f" --seed {args.seed}"
+        f" --model_type {args.model_type}"
+    )
+    cmd = f"{sys.executable} -m src.train{train_flags}"
     print(f"  Running: {cmd}\n")
     ret = os.system(cmd)
     if ret != 0:
