@@ -5,7 +5,7 @@ Shared utility functions used across the pipeline:
   - Seeding for reproducibility
   - Per-dataset normalisation statistics (mean / std)
   - Saving / loading normalisation stats to disk (JSON)
-  - Metric helpers (MAE, MAPE, R², RMSE)
+  - Metric helpers (MAE, MSE, MRE/MAPE, R², RMSE)
 """
 
 import json
@@ -112,10 +112,22 @@ def rmse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     return float(np.sqrt(np.mean((y_true - y_pred) ** 2)))
 
 
+def mse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """Mean Squared Error."""
+    return float(np.mean((y_true - y_pred) ** 2))
+
+
+def mre(y_true: np.ndarray, y_pred: np.ndarray, eps: float = _EPS) -> float:
+    """Mean Relative Error (same as MAPE, in percent)."""
+    return float(np.mean(np.abs((y_true - y_pred) / (np.abs(y_true) + eps))) * 100)
+
+
 def compute_all_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
-    """Return a dict with MAE, MAPE, R², and RMSE."""
+    """Return a dict with MAE, MSE, MRE, MAPE, R², and RMSE."""
     return {
         "MAE": mae(y_true, y_pred),
+        "MSE": mse(y_true, y_pred),
+        "MRE": mre(y_true, y_pred),
         "MAPE": mape(y_true, y_pred),
         "R2": r2_score(y_true, y_pred),
         "RMSE": rmse(y_true, y_pred),

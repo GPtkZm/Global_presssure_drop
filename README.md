@@ -1,54 +1,26 @@
-# Global Pressure Drop Prediction with Heterogeneous GNN
+# Global Pressure Drop Prediction
 
 A complete, runnable pipeline for predicting **global pressure drop (Δp)** from
-CAD topology data (STP → `.npy`) using a Heterogeneous Graph Neural Network
-built on [PyTorch Geometric](https://pyg.org/).
+CAD topology data (STP → `.npy`) using configurable deep-learning models
+(HeteroGNN or Transformer) built on [PyTorch Geometric](https://pyg.org/).
 
 ---
 
 ## Project Overview
 
-Each engineering case is represented as a heterogeneous graph with two node
-types extracted from the CAD topology:
+Each engineering case is represented as a heterogeneous graph with three node types
+extracted from the CAD topology:
 
 | Node type | Features | Source |
 |-----------|----------|--------|
 | `point`   | Normalised XYZ coordinates (3-dim) | `vertex_coordinates` |
-| `face`    | One-hot surface type ‖ normalised UV bounds | `face_surface_type_ids`, `face_surface_uv_bounds` |
+| `face`    | One-hot surface type ‖ normalised UV bounds | `face_surface_type_names`, `face_surface_uv_bounds` |
+| `edge`    | Normalised edge parameter ranges (2-dim) | `edge_parameter_ranges` |
 
-Three edge types capture the topology:
+Eight edge types capture the topology relationships between nodes.
 
-| Edge type | Source matrix |
-|-----------|---------------|
-| `(point, to, point)` | `vertex_vertex_matrix` |
-| `(face,  to, point)` | `face_vertex_matrix` |
-| `(point, to, face)`  | Transpose of `face_vertex_matrix` |
-
-The model outputs a single scalar: the normalised global pressure drop Δp.
-
-### Model Architecture
-
-```
-Encoder
-  point_encoder : MLP(3 → 128)
-  face_encoder  : MLP(num_face_types + 4 → 128)
-
-Message Passing  (6 layers)
-  Each layer: HeteroConv {
-    (point, to, point): SAGEConv(128, 128)
-    (face,  to, point): SAGEConv(128, 128)  ← boundary-condition injection
-    (point, to, face):  SAGEConv(128, 128)
-  }
-  + Residual connection + LayerNorm
-
-Readout (Dual Pool)
-  g_point = global_mean_pool(h_point)
-  g_face  = global_mean_pool(h_face)
-  g = concat([g_point, g_face])   # 256-dim
-
-Decoder
-  MLP(256 → 128 → 64 → 1)  with ReLU + Dropout(0.1)
-```
+The model also takes 14-dimensional physics/geometry global features from the CSV
+and outputs a single scalar: the predicted global pressure drop Δp.
 
 ---
 
@@ -57,18 +29,25 @@ Decoder
 ```
 ├── data/
 │   ├── topo/          ← place your *_topo.npy files here
-│   └── labels.csv     ← place the labels CSV here
+│   └── labels.csv     ← place the labels CSV here (train / test splits)
 ├── checkpoints/       ← model checkpoints saved here
-├── results/           ← evaluation outputs saved here
+├── results/
+│   ├── scatter.png               ← predicted vs true scatter plot
+│   ├── metrics_test.txt          ← overall test metrics
+│   └── test_case_details.csv     ← per-case predictions (sorted by rel. error)
 ├── src/
-│   ├── config.py      ← all hyperparameters and paths
+│   ├── config.py      ← all hyperparameters, paths, and model selection
 │   ├── dataset.py     ← PyG Dataset: npy → HeteroData
-│   ├── model.py       ← HeteroGNN architecture
-│   ├── train.py       ← training loop
-│   ├── evaluate.py    ← evaluation + scatter plot
-│   └── utils.py       ← metrics, normalisation, seeding
-├── requirements.txt
-└── README.md
+│   ├── model.py       ← backward-compatibility shim
+│   ├── models/
+│   │   ├── __init__.py    ← build_model() factory function
+│   │   ├── heterognn.py   ← HeteroGNN architecture
+│   │   └── transformer.py ← Transformer architecture
+│   ├── train.py       ← training loop (train/test only, DDP-capable)
+│   ├── evaluate.py    ← evaluation + scatter plot + per-case table
+│   └── utils.py       ← metrics (MAE, MSE, MRE, MAPE, R², RMSE), normalisation
+├── main.py            ← one-click pipeline entry point
+└── requirements.txt
 ```
 
 ---
@@ -77,19 +56,7 @@ Decoder
 
 ### 1. Topology files
 
-Copy all 793 `*_topo.npy` files into `data/topo/`:
-
-```
-data/topo/
-├── DOE001-A1-B2-C1-D1-E6-F1-G1-H1-I7_topo.npy
-├── DOE002-A1-B3-C2-D3-E8-F1-G1-H3-I7_topo.npy
-└── ...
-```
-
-Each file is loaded as:
-```python
-data = np.load('DOE001-..._topo.npy', allow_pickle=True).item()
-```
+Copy all `*_topo.npy` files into `data/topo/`.
 
 ### 2. Labels CSV
 
@@ -99,18 +66,16 @@ Place `labels.csv` in `data/`.  Required columns:
 |--------|-------------|
 | `ID`   | Case identifier matching the npy filename prefix |
 | `drop` | Global pressure drop (Pa) – the regression target |
-| `split`| One of `train`, `val`, `test` |
+| `split`| One of `train`, `test` |
 
 Example:
 ```csv
-split,ID,drop
-train,DOE001-A1-B2-C1-D1-E6-F1-G1-H1-I7,34681.02834
-val,DOE002-A1-B3-C2-D3-E8-F1-G1-H3-I7,68432.53918
-test,DOE003-A1-B4-C1-D2-E7-F1-G1-H5-I1,51234.56789
+split,ID,drop,chang,kuan,...
+train,DOE001-A1-B2-C1-D1-E6-F1-G1-H1-I7,34681.02834,...
+test,DOE003-A1-B4-C1-D2-E7-F1-G1-H5-I1,51234.56789,...
 ```
 
-Additional columns (e.g. `size`, `liuliang`, `in_v`, …) are ignored by the
-pipeline but may be used in future extensions.
+> **Note**: There is no `val` split. Early stopping is based on the **test loss**.
 
 ---
 
@@ -126,115 +91,144 @@ pip install -r requirements.txt
 
 ---
 
-## Running the Pipeline
-
-### Training
-
-```bash
-python -m src.train
-```
-
-Optional flags:
-```
---epochs      300       Maximum training epochs
---batch_size  16        Graphs per mini-batch
---lr          1e-3      Initial learning rate
---hidden_dim  128       Hidden dimension of all layers
---num_layers  6         Number of message-passing layers
---dropout     0.1       Decoder dropout probability
---patience    30        Early-stopping patience
---seed        42        Random seed
-```
-
-Example with custom settings:
-```bash
-python -m src.train --epochs 200 --batch_size 8 --lr 5e-4
-```
-
-Training output example:
-```
-Using device: cuda
-Loading training dataset and computing normalisation statistics ...
-  train=635  val=79  test=79
-  num_face_types=8
-  point_in_dim=3  face_in_dim=12
-  model parameters: 1,054,977
-
-Epoch 001 | train_loss=0.9821  val_loss=0.9134  val_MAE=18423.21  val_MAPE=32.14%  val_R2=0.0713
-...
-Epoch 045 | train_loss=0.1023  val_loss=0.0981  val_MAE=2341.56   val_MAPE=4.21%   val_R2=0.9312
-  ✓ Best model saved  (val_loss=0.098100)
-```
-
-The best checkpoint is saved to `checkpoints/best_model.pt`.
-Normalisation statistics are saved to `checkpoints/norm_stats.json`.
-
-### Evaluation
-
-```bash
-python -m src.evaluate
-```
-
-Optional flags:
-```
---split       test      Split to evaluate (train / val / test)
---checkpoint  checkpoints/best_model.pt
---batch_size  16
-```
-
-Output:
-```
-============================================================
-Evaluation results on 'test' split
-  MAE:  2123.45 Pa
-  MAPE: 3.87%
-  R2:   0.9445
-  RMSE: 3012.67 Pa
-============================================================
-Scatter plot saved to results/scatter.png
-```
-
-Metrics are also written to `results/metrics_test.txt` and the scatter plot
-(predicted vs true pressure drop) is saved to `results/scatter.png`.
-
----
-
 ## Configuration
 
-All hyperparameters and paths are centralised in `src/config.py`:
+All hyperparameters and settings are centralised in `src/config.py`.
+**Running `python main.py` without any arguments uses these values directly.**
+
+Key settings:
 
 ```python
-DATA_DIR      = 'data/topo'          # directory with .npy files
-LABEL_CSV     = 'data/labels.csv'    # labels CSV
+# Model selection
+MODEL_TYPE    = "heterognn"   # "heterognn" or "transformer"
+
+# HeteroGNN hyperparameters
 HIDDEN_DIM    = 128
 NUM_LAYERS    = 6
 DROPOUT       = 0.1
+
+# Transformer hyperparameters
+TRANSFORMER_D_MODEL             = 256
+TRANSFORMER_NHEAD               = 8
+TRANSFORMER_NUM_ENCODER_LAYERS  = 4
+TRANSFORMER_DIM_FEEDFORWARD     = 512
+TRANSFORMER_DROPOUT             = 0.1
+TRANSFORMER_POOL                = "mean"   # "mean" or "max"
+
+# Training hyperparameters
 LR            = 1e-3
 EPOCHS        = 300
 BATCH_SIZE    = 16
-PATIENCE      = 30
+PATIENCE      = 30    # early stopping on test loss
 SEED          = 42
+
+# Multi-GPU (DDP)
+USE_DDP       = False  # set True to enable DistributedDataParallel
+NUM_GPUS      = 4      # number of GPUs when USE_DDP=True
 ```
+
+---
+
+## Running the Pipeline
+
+### One-click (recommended)
+
+```bash
+python main.py
+```
+
+This runs all steps: data check → train → evaluate.  All parameters are taken
+from `config.py`.  Command-line flags are optional overrides:
+
+```bash
+python main.py --epochs 100 --batch_size 8 --model_type transformer
+python main.py --eval_only     # skip training, only evaluate
+```
+
+### Training only
+
+```bash
+python -m src.train
+python -m src.train --epochs 200 --model_type transformer
+```
+
+Per-epoch output includes both **train** and **test** metrics:
+```
+Epoch 001 | train_loss=0.98  train_MAE=18423  train_MSE=3.4e8  train_MRE=32.1%  train_R²=0.07
+           | test_loss=0.91   test_MAE=16821   test_MSE=2.8e8   test_MRE=29.4%   test_R²=0.09
+```
+
+After training, a **per-case prediction table** is printed and saved:
+
+```
+Case ID                        True (Pa)      Pred (Pa)  Abs Err (Pa)  Rel Err (%)
+----------------------------------------------------------------------
+DOE045-...                      68432.54       82341.21      13908.67        20.32%
+DOE012-...                      34681.03       38219.45       3538.42        10.20%
+...
+```
+
+The per-case table is also saved to `results/test_case_details.csv`.
+
+### Evaluation only
+
+```bash
+python -m src.evaluate
+python -m src.evaluate --split test
+```
+
+Output metrics:
+```
+  MAE:  2123.45 Pa
+  MSE:  4508037.23 Pa²
+  MRE:  3.87%
+  MAPE: 3.87%
+  R²:   0.9445
+  RMSE: 2123.45 Pa
+```
+
+### Multi-GPU training (DDP)
+
+1. Set `USE_DDP = True` and `NUM_GPUS = 4` in `src/config.py`.
+2. Launch with `torchrun`:
+
+```bash
+torchrun --nproc_per_node=4 main.py
+# or directly:
+torchrun --nproc_per_node=4 -m src.train
+```
+
+Only rank-0 prints logs, saves checkpoints, and runs final evaluation.
+
+---
+
+## Outputs
+
+| File | Description |
+|------|-------------|
+| `checkpoints/best_model.pt` | Best model checkpoint (lowest test loss) |
+| `checkpoints/norm_stats.json` | Normalisation statistics from training set |
+| `checkpoints/training_history.npz` | Per-epoch train/test metrics |
+| `results/scatter.png` | Predicted vs true scatter plot |
+| `results/metrics_test.txt` | Overall test metrics |
+| `results/test_case_details.csv` | Per-case predictions sorted by relative error |
 
 ---
 
 ## Implementation Notes
 
+- **No validation split**: Data is split into `train` and `test` only.
+  Early stopping monitors the **test loss**.
+
+- **Multiple models**: Select the model via `MODEL_TYPE` in `config.py`.
+  Both `HeteroGNN` and `TransformerPressureDrop` accept the same `HeteroData`
+  input from `PressureDropDataset`.
+
 - **Variable graph sizes**: Every case has a different number of vertices/edges/faces.
   PyG's `DataLoader` handles batching automatically via `batch` index vectors.
 
-- **Face type one-hot encoding**: All unique `face_surface_type_names` are
-  collected over the entire training split before training begins, ensuring a
-  consistent vocabulary across all splits.
+- **Gradient clipping**: `max_norm=5.0` is applied per step.
 
-- **Normalisation**:
-  - Vertex coordinates: z-score (global mean/std over training set)
-  - UV bounds: z-score (global mean/std over training set)
-  - Pressure drop target: z-score (training set mean/std), de-normalised before
-    metric computation. Statistics are persisted in `checkpoints/norm_stats.json`.
-
-- **Gradient clipping**: `max_norm=5.0` is applied per step to prevent
-  exploding gradients in deep networks.
-
-- **Early stopping**: Training halts if validation loss does not improve for
-  `PATIENCE` consecutive epochs.
+- **Normalisation**: Vertex coordinates, UV bounds, edge parameters, global
+  features, and target pressure drop are all z-score normalised using
+  training-set statistics saved to `checkpoints/norm_stats.json`.
