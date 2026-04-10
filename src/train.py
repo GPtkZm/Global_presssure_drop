@@ -299,7 +299,7 @@ def main():
 
     if is_main_process():
         raw_model = get_raw_model(model)
-        num_params = sum(p.numel() for p in raw.parameters() if p.requires_grad)
+        num_params = sum(p.numel() for p in raw_model.parameters() if p.requires_grad)
         print(f"  model parameters: {num_params:,}")
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
@@ -329,6 +329,7 @@ def main():
 
         # ---- Train -------------------------------------------------------
         model.train()
+        raw_model_train = get_raw_model(model)
         total_train_loss = 0.0
         num_train = 0
         for batch in tqdm(
@@ -339,8 +340,7 @@ def main():
         ):
             batch = batch.to(device)
             optimizer.zero_grad()
-            raw_model = get_raw_model(model)
-            pred = raw_model(batch, batch.global_features).view(-1)
+            pred = raw_model_train(batch, batch.global_features).view(-1)
             y = batch.y.view(-1)
             loss = criterion(pred, y)
             loss.backward()
