@@ -96,3 +96,21 @@ GLOBAL_MLP_DIM = 64
 # Launch with: torchrun --nproc_per_node=<NUM_GPUS> main.py
 USE_DDP = False        # Enable DistributedDataParallel training
 NUM_GPUS = 4           # Number of GPUs to use when USE_DDP=True
+
+# ---------------------------------------------------------------------------
+# Point cloud data (fusion model)
+# ---------------------------------------------------------------------------
+# Path to the single .npy file holding all 4,902 point-cloud records
+CLOUD_NPY_PATH = os.path.join(ROOT_DIR, "data", "cloud", "cloud_all.npy")
+
+# Feature keys to read from each point-cloud record (7 input channels)
+CLOUD_INPUT_KEYS = ["X", "Y", "Z", "dist_re", "dist_ab", "board_re", "board_ab"]
+
+# Number of input feature channels for the point-cloud GNN
+CLOUD_INPUT_DIM = 7
+
+# Number of nearest neighbours for KNN graph construction
+CLOUD_K = 16
+
+# Maximum number of points to keep per cloud (subsampled if larger)
+MAX_CLOUD_POINTS = 4096
