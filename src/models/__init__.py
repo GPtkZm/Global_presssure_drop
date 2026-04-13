@@ -11,6 +11,8 @@ Usage
 """
 
 from src.config import (
+    CLOUD_INPUT_DIM,
+    CLOUD_K,
     DROPOUT,
     GLOBAL_FEATURE_COLUMNS,
     GLOBAL_MLP_DIM,
@@ -24,10 +26,11 @@ from src.config import (
     TRANSFORMER_NUM_ENCODER_LAYERS,
     TRANSFORMER_POOL,
 )
+from src.models.fusion_model import FusionModel
 from src.models.heterognn import HeteroGNN
 from src.models.transformer import TransformerPressureDrop
 
-__all__ = ["HeteroGNN", "TransformerPressureDrop", "build_model"]
+__all__ = ["HeteroGNN", "TransformerPressureDrop", "FusionModel", "build_model", "build_fusion_model"]
 
 
 def build_model(cfg: dict) -> "torch.nn.Module":
@@ -91,7 +94,36 @@ def build_model(cfg: dict) -> "torch.nn.Module":
             global_mlp_dim=cfg.get("global_mlp_dim", GLOBAL_MLP_DIM),
         )
 
+    if model_type == "fusion":
+        return build_fusion_model(cfg)
+
     raise ValueError(
         f"Unknown model_type '{model_type}'. "
-        f"Supported types: 'heterognn', 'transformer'."
+        f"Supported types: 'heterognn', 'transformer', 'fusion'."
+    )
+
+
+def build_fusion_model(cfg: dict) -> "FusionModel":
+    """Convenience factory for FusionModel.
+
+    Parameters
+    ----------
+    cfg : dict
+        Must contain: ``point_in_dim``, ``face_in_dim``.
+        Optional overrides: ``edge_in_dim``, ``global_feature_dim``,
+        ``cloud_in_dim``, ``cloud_hidden_dim``, ``cloud_num_layers``,
+        ``cloud_k``, ``topo_hidden_dim``, ``global_mlp_dim``, ``dropout``.
+    """
+    return FusionModel(
+        point_in_dim=cfg["point_in_dim"],
+        face_in_dim=cfg["face_in_dim"],
+        edge_in_dim=cfg.get("edge_in_dim", 2),
+        global_feature_dim=cfg.get("global_feature_dim", len(GLOBAL_FEATURE_COLUMNS)),
+        cloud_in_dim=cfg.get("cloud_in_dim", CLOUD_INPUT_DIM),
+        cloud_hidden_dim=cfg.get("cloud_hidden_dim", 128),
+        cloud_num_layers=cfg.get("cloud_num_layers", 6),
+        cloud_k=cfg.get("cloud_k", CLOUD_K),
+        topo_hidden_dim=cfg.get("topo_hidden_dim", 64),
+        global_mlp_dim=cfg.get("global_mlp_dim", GLOBAL_MLP_DIM),
+        dropout=cfg.get("dropout", DROPOUT),
     )
