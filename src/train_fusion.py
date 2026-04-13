@@ -141,7 +141,7 @@ def evaluate(model, loader, criterion, device, norm_stats, task: str):
                 _, p_pred, cloud_batch = model(batch, task="node_pressure")
                 # cloud_y is stored as (N, 1) per batch
                 cloud_n = batch.cloud_n.view(-1)
-                cloud_batch_cpu = torch.arange(
+                cloud_batch_idx = torch.arange(
                     cloud_n.shape[0], device=cloud_n.device
                 ).repeat_interleave(cloud_n)
                 y_node = batch.cloud_y.view(-1)  # (N,)
@@ -370,7 +370,7 @@ def main():
         model, test_loader, criterion, device, norm_stats, args.task
     )
 
-    unit = "Pa" if args.task == "drop" else "(pressure unit)"
+    unit = "Pa" if args.task == "drop" else "Pa"
     print(
         f"\n{'='*60}\n"
         f"Final Test Results  [task={args.task}]\n"

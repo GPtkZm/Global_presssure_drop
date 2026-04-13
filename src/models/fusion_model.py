@@ -242,6 +242,8 @@ class CADTopoEncoder(nn.Module):
             h_point = self.point_norms[i](h_point + F.relu(self.dropout(out["point"])))
             h_face = self.face_norms[i](h_face + F.relu(self.dropout(out["face"])))
             if h_edge.shape[0] > 0:
+                # out['edge'] may be absent if no edge-type messages were aggregated;
+                # fall back to zeros (identity residual) to avoid a silent skip.
                 h_edge = self.edge_norms[i](
                     h_edge + F.relu(self.dropout(out.get("edge", torch.zeros_like(h_edge))))
                 )

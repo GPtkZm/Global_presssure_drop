@@ -307,7 +307,7 @@ class FusionDataset(Dataset):
         topo = self._load_topo(case_id)
         cloud_rec = self._cloud_index[case_id]
 
-        data = self._build_graph(topo, pressure_drop, row, cloud_rec)
+        data = self._build_graph(topo, pressure_drop, row, cloud_rec, sample_idx=idx)
 
         if self._transform is not None:
             data = self._transform(data)
@@ -318,7 +318,7 @@ class FusionDataset(Dataset):
     # Graph construction
     # ------------------------------------------------------------------
 
-    def _build_graph(self, topo: dict, pressure_drop: float, row, cloud_rec: dict) -> HeteroData:
+    def _build_graph(self, topo: dict, pressure_drop: float, row, cloud_rec: dict, sample_idx: int = 0) -> HeteroData:
         stats = self._norm_stats
 
         # ============================================================
@@ -407,6 +407,8 @@ class FusionDataset(Dataset):
         # ============================================================
         gm = np.array(stats["global_mean"], dtype=np.float32)
         gs = np.array(stats["global_std"], dtype=np.float32)
+        # Missing CSV columns are imputed with the column mean (0.0 before z-score,
+        # which becomes 0.0 after z-score), matching the strategy in dataset.py.
         gvals = np.array(
             [float(row[c]) if c in row.index else 0.0 for c in GLOBAL_FEATURE_COLUMNS],
             dtype=np.float32,
@@ -430,9 +432,12 @@ class FusionDataset(Dataset):
 
         N_pts = feat_arr.shape[0]
         if N_pts > self.max_points:
-            idx = np.random.choice(N_pts, self.max_points, replace=False)
-            feat_arr = feat_arr[idx]
-            pres_arr = pres_arr[idx]
+            # Use a sample-specific RNG so subsampling is reproducible
+            # regardless of worker ordering or epoch shuffling.
+            rng = np.random.RandomState(sample_idx)
+            chosen = rng.choice(N_pts, self.max_points, replace=False)
+            feat_arr = feat_arr[chosen]
+            pres_arr = pres_arr[chosen]
             N_pts = self.max_points
 
         # Normalise cloud features per-column
