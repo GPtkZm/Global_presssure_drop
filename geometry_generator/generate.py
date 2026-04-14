@@ -32,7 +32,7 @@ import numpy as np
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="geometry_generator",
-        description="Procedurally generate pipe/channel network geometries.",
+        description="Procedurally generate EV battery cooling channel network geometries.",
     )
     parser.add_argument(
         "--config",
@@ -111,12 +111,23 @@ def run(cfg: dict[str, Any], *, skip_summary: bool = False) -> None:
     out_cfg = cfg["output"]
     output_dir = Path(out_cfg["dir"])
     num_samples: int = cfg["num_samples"]
+    channel_width_mm: float = float(
+        cfg.get("manufacturing", {}).get("channel_width_mm", 12)
+    )
 
     image_paths: list[Path] = []
     sample_ids: list[str] = []
 
-    print(f"[geometry_generator] Generating {num_samples} network(s)…")
+    # Coverage tracking
+    coverages: list[float] = []
+    mfg_issues: int = 0
+
+    print(f"[geometry_generator] Generating {num_samples} EV cooling channel network(s)…")
     print(f"[geometry_generator] Output directory: {output_dir.resolve()}")
+    print(
+        f"[geometry_generator] Inlet: {cfg['inlet']['wall']} wall pos {cfg['inlet']['pos']}  |  "
+        f"Outlet: {cfg['outlet']['wall']} wall pos {cfg['outlet']['pos']}"
+    )
 
     t0 = time.time()
 
@@ -129,6 +140,9 @@ def run(cfg: dict[str, Any], *, skip_summary: bool = False) -> None:
 
         # ── Generate network ──────────────────────────────────────────────
         network = generate_network(cfg, rng=rng)
+
+        # Inject channel_width_mm so graph builder can use it
+        network["channel_width_mm"] = channel_width_mm
 
         # ── Save grid.npy ─────────────────────────────────────────────────
         if out_cfg.get("save_grid", True):
@@ -147,13 +161,43 @@ def run(cfg: dict[str, Any], *, skip_summary: bool = False) -> None:
             image_paths.append(preview_path)
             sample_ids.append(sample_id)
 
+        # ── Statistics ────────────────────────────────────────────────────
+        coverage = network.get("coverage", 0.0)
+        mfg_ok = network.get("manufacturing_ok", True)
+        mfg_warnings = network.get("manufacturing_warnings", [])
+        pipe_count = int(np.sum(network["grid"] != 0))
+        coverages.append(coverage)
+        if not mfg_ok:
+            mfg_issues += 1
+
         elapsed = time.time() - t0
+        status = "✓" if mfg_ok else f"⚠ {len(mfg_warnings)} warning(s)"
         print(
             f"  [{i + 1:>{len(str(num_samples))}}/{num_samples}] "
             f"{sample_id}  —  "
-            f"nodes={sum(1 for row in network['grid'] for v in row if v != 0)}  "
+            f"nodes={pipe_count}  "
+            f"coverage={coverage:.1%}  "
+            f"mfg={status}  "
             f"({elapsed:.1f}s elapsed)"
         )
+        if mfg_warnings:
+            for w in mfg_warnings[:3]:  # cap at 3 to avoid flooding output
+                print(f"    ↳ {w}")
+
+    # ── Batch summary ─────────────────────────────────────────────────────
+    if coverages:
+        avg_cov = sum(coverages) / len(coverages)
+        min_cov = min(coverages)
+        max_cov = max(coverages)
+        print(
+            f"\n[geometry_generator] Coverage summary: "
+            f"avg={avg_cov:.1%}  min={min_cov:.1%}  max={max_cov:.1%}"
+        )
+        if mfg_issues:
+            print(
+                f"[geometry_generator] Manufacturing warnings: "
+                f"{mfg_issues}/{num_samples} sample(s) had constraint issues"
+            )
 
     # ── Summary montage ───────────────────────────────────────────────────
     if (
@@ -195,3 +239,4 @@ def main(argv: list[str] | None = None) -> None:
 
 if __name__ == "__main__":
     main()
+

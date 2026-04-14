@@ -1,72 +1,78 @@
 # ============================================================
 # geometry_generator/config.yaml
-# Default configuration for the pipe-network geometry generator.
+# Configuration for the EV battery liquid cooling channel
+# network geometry generator.
 # All parameters are documented inline.
 # ============================================================
 
 # ── Grid ────────────────────────────────────────────────────
+# Plate: 1200mm × 600mm at 20mm resolution → 60 × 30 grid
 grid:
   Nx: 60          # Number of columns  (x-axis)
   Ny: 30          # Number of rows     (y-axis)
 
 # ── Inlet / Outlet ──────────────────────────────────────────
-# Specify each port as {wall: left|right|top|bottom, pos: <index>}
-# 'pos' is the column index for top/bottom walls, or the row index
-# for left/right walls.  Zero-based.
+# IMPORTANT: Both inlet AND outlet are on the LEFT wall.
+# The network must form a serpentine/U-shape to connect them.
 inlet:
   wall: left
-  pos: 5
+  pos: 5          # row index (zero-based)
 
 outlet:
-  wall: right
-  pos: 25
+  wall: left
+  pos: 25         # row index (zero-based)
 
-# ── Main path ───────────────────────────────────────────────
-main_path:
-  # Probability of adding a vertical perturbation step while
-  # tracing the path toward the outlet (0 = straight, 1 = very wiggly)
-  p_perturb: 0.30
-  # Weight given to moving *toward* the outlet vs. random exploration.
-  # Higher value = more direct path.
-  bias_toward_outlet: 0.70
-  # Maximum number of BFS/random steps before forcing BFS fallback.
-  max_steps: 5000
+# ── Backbone generation ──────────────────────────────────────
+# Multiple horizontal pipe runs in a serpentine pattern.
+# Since both ports are on the left, the flow snakes right-and-back.
+backbone:
+  num_backbones: 6          # number of horizontal pipe runs
+  type: serpentine          # "serpentine" only (parallel not implemented)
+  spacing: 4                # vertical spacing between backbones (cells)
+                            # (informational; actual spacing = (outlet_y-inlet_y)/(N-1))
+  p_perturb: 0.10           # probability of vertical perturbation per step
+  max_perturb: 1            # max vertical deviation from nominal y-level
 
-# ── Branches ────────────────────────────────────────────────
-branches:
-  # Probability of starting a branch at each main-path cell
-  p_branch: 0.20
-  # Probability of recursively splitting a branch cell
-  p_split: 0.10
-  # Maximum recursion depth for branch splits
-  max_depth: 2
-  # Maximum length (cells) of a single branch segment
-  max_length: 12
-  # Minimum Manhattan distance a branch must keep from *other* branches
-  # (the branch's own cells are exempt from this check)
-  min_spacing: 2
-  # Allowed growth directions for branches: list of [dx, dy] vectors.
-  # Default allows right, up, down (no back-flow).
-  directions:
-    - [1,  0]
-    - [0,  1]
-    - [0, -1]
+# ── Vertical connectors ──────────────────────────────────────
+# Short vertical segments connecting adjacent horizontal backbones.
+connectors:
+  density: 0.15             # probability of placing a connector at each column
+  min_length: 2             # minimum connector length (cells between backbones)
+  p_prune: 0.30             # probability of removing a connector (Stage 3)
 
-# ── Loops ────────────────────────────────────────────────────
+# ── Coverage requirements ─────────────────────────────────────
+coverage:
+  min_coverage: 0.30        # minimum fraction of grid cells that must be channels
+  target_coverage: [0.40, 0.70]  # target coverage range (informational)
+  subregion_cols: 12        # divide grid into 12 subregion columns
+  subregion_rows: 6         # divide grid into 6 subregion rows
+                            # each subregion = 5×5 cells for 60×30 grid
+
+# ── Manufacturing constraints ─────────────────────────────────
+manufacturing:
+  min_spacing: 2            # min cells between parallel channels (≈10mm wall)
+  max_consecutive_turns: 3  # max direction changes before requiring straight segment
+  channel_width_mm: 12      # channel width in mm (stored as edge feature)
+
+# ── Protection zone ───────────────────────────────────────────
+# Within this radius (Manhattan distance) of inlet/outlet:
+#   no branching, merging, or loop formation allowed.
+protection_radius: 4        # cells around inlet/outlet
+
+# ── Dead-end policy ───────────────────────────────────────────
+# If false, degree-1 nodes (other than inlet/outlet) are removed.
+allow_dead_ends: false
+
+# ── Loops ─────────────────────────────────────────────────────
 loops:
-  # Probability that a branch tip tries to reconnect to an existing
-  # pipe cell, creating a loop/cycle.
-  p_loop: 0.05
+  p_loop: 0.20              # higher value encourages mesh-like structures
+                            # (connectors inherently form loops; this controls
+                            #  extra loop probability during pruning)
 
 # ── Pipe width ───────────────────────────────────────────────
 # Visual thickness in grid cells (1 = single-cell pipe).
 # Values > 1 dilate the pipe mask for visualization only.
 pipe_width: 1
-
-# ── Dead-end cleanup ─────────────────────────────────────────
-# If true, iteratively removes dead-end cells (degree-1 nodes) that
-# are NOT the inlet or outlet.
-remove_dead_ends: false
 
 # ── Batch generation ─────────────────────────────────────────
 num_samples: 10
@@ -88,12 +94,14 @@ visualization:
   figsize: [10, 5]     # [width, height] in inches
   # Colormaps / colours
   color_empty: "#f5f5f5"
-  color_main: "#1f77b4"      # main path
-  color_branch: "#ff7f0e"    # branches
+  color_main: "#1f77b4"      # backbone cells
+  color_branch: "#ff7f0e"    # connector cells
   color_inlet: "#2ca02c"     # inlet marker
   color_outlet: "#d62728"    # outlet marker
+  color_protection: "#ffe0e0"  # protection zone shading
   show_grid_lines: true
   show_inlet_outlet: true
+  show_protection_zone: true   # shade protection zone in visualization
   # Summary image
   summary_cols: 5            # columns in the summary montage
   summary_dpi: 80

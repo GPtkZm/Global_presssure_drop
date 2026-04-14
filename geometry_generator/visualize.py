@@ -34,20 +34,36 @@ def _build_rgb_image(
     color_empty: str,
     color_main: str,
     color_branch: str,
+    protection_cells: set[tuple[int, int]] | None = None,
+    color_protection: str | None = None,
 ) -> np.ndarray:
-    """Convert the integer grid to an RGB image array for imshow."""
+    """Convert the integer grid to an RGB image array for imshow.
+
+    Cell types:
+    * 0 → empty (or protection zone background)
+    * 1 → backbone pipe
+    * 2 → connector pipe
+    """
     Ny, Nx = grid.shape
     img = np.ones((Ny, Nx, 3), dtype=float)
 
     ce = _hex_to_rgb(color_empty)
     cm = _hex_to_rgb(color_main)
     cb = _hex_to_rgb(color_branch)
+    cp = _hex_to_rgb(color_protection) if color_protection else None
 
     for y in range(Ny):
         for x in range(Nx):
             v = grid[y, x]
             if v == 0:
-                img[y, x] = ce
+                if (
+                    cp is not None
+                    and protection_cells is not None
+                    and (x, y) in protection_cells
+                ):
+                    img[y, x] = cp
+                else:
+                    img[y, x] = ce
             elif v == 1:
                 img[y, x] = cm
             else:
@@ -82,17 +98,23 @@ def visualize_network(
     Ny, Nx = grid.shape
     inlet: tuple[int, int] = network["inlet"]
     outlet: tuple[int, int] = network["outlet"]
+    coverage: float = network.get("coverage", 0.0)
+    mfg_ok: bool = network.get("manufacturing_ok", True)
+    protection_cells: set | None = network.get("protection_cells")
 
     figsize = tuple(vis_cfg["figsize"])
     dpi = vis_cfg["dpi"]
     fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
 
     # ── Raster image ──────────────────────────────────────────────────────
+    show_pz = vis_cfg.get("show_protection_zone", True) and protection_cells
     img = _build_rgb_image(
         grid,
         color_empty=vis_cfg["color_empty"],
         color_main=vis_cfg["color_main"],
         color_branch=vis_cfg["color_branch"],
+        protection_cells=protection_cells if show_pz else None,
+        color_protection=vis_cfg.get("color_protection") if show_pz else None,
     )
     ax.imshow(img, origin="upper", aspect="equal", interpolation="nearest")
 
@@ -118,20 +140,27 @@ def visualize_network(
 
     # ── Legend ────────────────────────────────────────────────────────────
     patches = [
-        mpatches.Patch(color=vis_cfg["color_main"], label="Main path"),
-        mpatches.Patch(color=vis_cfg["color_branch"], label="Branch"),
+        mpatches.Patch(color=vis_cfg["color_main"], label="Backbone"),
+        mpatches.Patch(color=vis_cfg["color_branch"], label="Connector"),
         mpatches.Patch(color=vis_cfg["color_inlet"], label="Inlet"),
         mpatches.Patch(color=vis_cfg["color_outlet"], label="Outlet"),
     ]
+    if show_pz and vis_cfg.get("color_protection"):
+        patches.append(
+            mpatches.Patch(
+                color=vis_cfg["color_protection"], label="Protection zone"
+            )
+        )
     ax.legend(handles=patches, loc="upper right", fontsize=7, framealpha=0.8)
 
-    # ── Title ─────────────────────────────────────────────────────────────
-    br_cfg = cfg["branches"]
+    # ── Title (includes coverage and manufacturing status) ────────────────
+    bb_cfg = cfg.get("backbone", {})
+    mfg_str = "✓" if mfg_ok else "⚠"
     title = (
         f"{sample_id}  |  {Nx}×{Ny} grid  |  "
-        f"p_branch={br_cfg['p_branch']:.2f}  "
-        f"p_split={br_cfg['p_split']:.2f}  "
-        f"max_depth={br_cfg['max_depth']}"
+        f"coverage={coverage:.1%}  "
+        f"backbones={bb_cfg.get('num_backbones', '?')}  "
+        f"mfg={mfg_str}"
     )
     ax.set_title(title, fontsize=8, pad=4)
     ax.set_xlabel("x (col)")
@@ -198,10 +227,11 @@ def build_summary_image(
         row, col = divmod(idx, n_cols)
         axes[row][col].axis("off")
 
-    fig.suptitle("Generated Pipe Networks – Summary", fontsize=10, y=1.01)
+    fig.suptitle("Generated EV Battery Cooling Channel Networks – Summary", fontsize=10, y=1.01)
     fig.tight_layout()
 
     save_path = Path(save_path)
     save_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(save_path, dpi=dpi, bbox_inches="tight")
     plt.close(fig)
+
