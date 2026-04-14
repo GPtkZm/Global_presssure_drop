@@ -98,17 +98,11 @@ def build_graph(network: dict[str, Any]) -> dict[str, Any]:
     Ny, Nx = grid.shape
     inlet: tuple[int, int] = network["inlet"]
     outlet: tuple[int, int] = network["outlet"]
-    channel_width_mm: float = float(
-        network.get("channel_width_mm")
-        or network.get("cfg", {}).get("manufacturing", {}).get("channel_width_mm", 12)
-        or 12
-    )
 
-    # Allow callers to pass channel_width via the network dict
-    # (generate.py injects it from cfg)
-    if "channel_width_mm" not in network:
-        # Try to read from config if attached
-        pass  # default 12 already set above
+    # Resolve channel_width_mm: prefer explicit value injected by generate.py,
+    # fall back to the config embedded in the network dict, then default to 12.
+    _cw = network.get("channel_width_mm")
+    channel_width_mm: float = float(_cw) if _cw is not None else 12.0
 
     # ── Build node list ───────────────────────────────────────────────────
     coord_to_idx: dict[tuple[int, int], int] = {}

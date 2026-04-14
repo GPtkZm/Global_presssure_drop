@@ -58,6 +58,11 @@ def resolve_port(wall: str, pos: int, Nx: int, Ny: int) -> tuple[int, int]:
         Row index for left/right walls; column index for top/bottom walls.
     Nx, Ny:
         Grid dimensions.
+
+    Returns
+    -------
+    tuple[int, int]
+        ``(x, y)`` coordinate on the grid boundary.
     """
     if wall == "left":
         return (0, pos)
