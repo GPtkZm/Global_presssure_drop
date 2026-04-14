@@ -7,6 +7,8 @@ Public functions
 ----------------
 * :func:`visualize_network`   – save a single-network PNG
 * :func:`build_summary_image` – save a thumbnail montage of all networks
+
+Visualization uses US English spelling conventions throughout.
 """
 
 from __future__ import annotations

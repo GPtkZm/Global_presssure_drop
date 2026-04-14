@@ -497,7 +497,7 @@ def generate_network(
     # Recompute main_path to only include cells still in grid
     main_path_clean = [c for c in main_path if grid[c[1], c[0]] != 0]
 
-    # ── 6. Optional pipe dilation for visualisation ───────────────────────
+    # ── 6. Optional pipe dilation for visualization ───────────────────────
     pipe_width: int = cfg.get("pipe_width", 1)
     grid_vis = _dilate(grid, pipe_width, Nx, Ny) if pipe_width > 1 else grid.copy()
 

@@ -4,7 +4,7 @@ Procedural pipe/channel network geometry generator for 2-D grids.
 
 Generates random pipe-network topologies with **guaranteed inlet→outlet
 connectivity**, configurable branching, and high-quality matplotlib
-visualisations.  Designed as a standalone tool that does **not** interfere
+visualizations.  Designed as a standalone tool that does **not** interfere
 with the existing `src/` machine-learning pipeline.
 
 ---
@@ -96,7 +96,7 @@ JSON dictionary:
 - `edges` are undirected; each pair stored once (`src < dst`).
 
 ### `preview.png`
-Colour-coded raster image:
+Color-coded raster image:
 - **Blue** cells = main path
 - **Orange** cells = branches
 - **Green triangle** = inlet
