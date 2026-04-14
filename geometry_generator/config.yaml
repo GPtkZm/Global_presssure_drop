@@ -1,0 +1,100 @@
+# ============================================================
+# geometry_generator/config.yaml
+# Default configuration for the pipe-network geometry generator.
+# All parameters are documented inline.
+# ============================================================
+
+# ── Grid ────────────────────────────────────────────────────
+grid:
+  Nx: 60          # Number of columns  (x-axis)
+  Ny: 30          # Number of rows     (y-axis)
+
+# ── Inlet / Outlet ──────────────────────────────────────────
+# Specify each port as {wall: left|right|top|bottom, pos: <index>}
+# 'pos' is the column index for top/bottom walls, or the row index
+# for left/right walls.  Zero-based.
+inlet:
+  wall: left
+  pos: 5
+
+outlet:
+  wall: right
+  pos: 25
+
+# ── Main path ───────────────────────────────────────────────
+main_path:
+  # Probability of adding a vertical perturbation step while
+  # tracing the path toward the outlet (0 = straight, 1 = very wiggly)
+  p_perturb: 0.30
+  # Weight given to moving *toward* the outlet vs. random exploration.
+  # Higher value = more direct path.
+  bias_toward_outlet: 0.70
+  # Maximum number of BFS/random steps before forcing BFS fallback.
+  max_steps: 5000
+
+# ── Branches ────────────────────────────────────────────────
+branches:
+  # Probability of starting a branch at each main-path cell
+  p_branch: 0.20
+  # Probability of recursively splitting a branch cell
+  p_split: 0.10
+  # Maximum recursion depth for branch splits
+  max_depth: 2
+  # Maximum length (cells) of a single branch segment
+  max_length: 12
+  # Minimum Manhattan distance a branch must keep from *other* branches
+  # (the branch's own cells are exempt from this check)
+  min_spacing: 2
+  # Allowed growth directions for branches: list of [dx, dy] vectors.
+  # Default allows right, up, down (no back-flow).
+  directions:
+    - [1,  0]
+    - [0,  1]
+    - [0, -1]
+
+# ── Loops ────────────────────────────────────────────────────
+loops:
+  # Probability that a branch tip tries to reconnect to an existing
+  # pipe cell, creating a loop/cycle.
+  p_loop: 0.05
+
+# ── Pipe width ───────────────────────────────────────────────
+# Visual thickness in grid cells (1 = single-cell pipe).
+# Values > 1 dilate the pipe mask for visualization only.
+pipe_width: 1
+
+# ── Dead-end cleanup ─────────────────────────────────────────
+# If true, iteratively removes dead-end cells (degree-1 nodes) that
+# are NOT the inlet or outlet.
+remove_dead_ends: false
+
+# ── Batch generation ─────────────────────────────────────────
+num_samples: 10
+
+# Random seed.  Set to an integer for reproducibility; null = random.
+seed: null
+
+# ── Output ───────────────────────────────────────────────────
+output:
+  dir: output          # Root directory for generated files
+  save_grid: true      # Save grid.npy for each sample
+  save_graph: true     # Save graph.json for each sample
+  save_image: true     # Save preview.png for each sample
+  save_summary: true   # Save summary.png (thumbnail grid of all samples)
+
+# ── Visualization ────────────────────────────────────────────
+visualization:
+  dpi: 120
+  figsize: [10, 5]     # [width, height] in inches
+  # Colormaps / colours
+  color_empty: "#f5f5f5"
+  color_main: "#1f77b4"      # main path
+  color_branch: "#ff7f0e"    # branches
+  color_inlet: "#2ca02c"     # inlet marker
+  color_outlet: "#d62728"    # outlet marker
+  show_grid_lines: true
+  show_inlet_outlet: true
+  # Summary image
+  summary_cols: 5            # columns in the summary montage
+  summary_dpi: 80
+  summary_figsize: null      # null = auto-computed from num_samples
