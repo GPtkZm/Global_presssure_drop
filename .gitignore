@@ -1,40 +1,18 @@
-# Python
-__pycache__/
-*.py[cod]
-*.so
-*.egg-info/
-dist/
-build/
-.eggs/
-src/__pycache__/
+# 忽略所有 *_results/ 目录
+*_results/
 
-# Virtual environments
-.venv/
-venv/
-env/
+# 忽略 best_result/ 目录
+best_result/
 
-# Data files (user-provided, not tracked)
-data/topo/*.npy
-data/labels.csv
+# 忽略所有 .npy 和 .csv 文件
+*.npy
+*.csv
 
-# Model checkpoints (large binary files)
-checkpoints/*.pt
-checkpoints/norm_stats.json
-checkpoints/training_history.npz
+# 允许上传项目根目录下的 results/ 目录
+!results/
 
-# Results
+# 但忽略 results/ 中的大文件类型（如果你不想上传）
 results/*.png
 results/*.txt
+results/*.npz
 
-# Jupyter
-.ipynb_checkpoints/
-*.ipynb
-
-# OS
-.DS_Store
-Thumbs.db
-
-# IDE
-.idea/
-.vscode/
-*.swp
