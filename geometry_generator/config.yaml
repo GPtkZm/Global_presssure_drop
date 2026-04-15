@@ -1,0 +1,108 @@
+# ============================================================
+# geometry_generator/config.yaml
+# Configuration for the EV battery liquid cooling channel
+# network geometry generator.
+# All parameters are documented inline.
+# ============================================================
+
+# ── Grid ────────────────────────────────────────────────────
+# Plate: 1200mm × 600mm at 20mm resolution → 60 × 30 grid
+grid:
+  Nx: 60          # Number of columns  (x-axis)
+  Ny: 30          # Number of rows     (y-axis)
+
+# ── Inlet / Outlet ──────────────────────────────────────────
+# IMPORTANT: Both inlet AND outlet are on the LEFT wall.
+# The network must form a serpentine/U-shape to connect them.
+inlet:
+  wall: left
+  pos: 5          # row index (zero-based)
+
+outlet:
+  wall: left
+  pos: 25         # row index (zero-based)
+
+# ── Backbone generation ──────────────────────────────────────
+# Multiple horizontal pipe runs in a serpentine pattern.
+# Since both ports are on the left, the flow snakes right-and-back.
+backbone:
+  num_backbones: 6          # number of horizontal pipe runs
+  type: serpentine          # "serpentine" only (parallel not implemented)
+  spacing: 4                # vertical spacing between backbones (cells)
+                            # (informational; actual spacing = (outlet_y-inlet_y)/(N-1))
+  p_perturb: 0.10           # probability of vertical perturbation per step
+  max_perturb: 1            # max vertical deviation from nominal y-level
+
+# ── Vertical connectors ──────────────────────────────────────
+# Short vertical segments connecting adjacent horizontal backbones.
+connectors:
+  density: 0.15             # probability of placing a connector at each column
+  min_length: 2             # minimum connector length (cells between backbones)
+  p_prune: 0.30             # probability of removing a connector (Stage 3)
+
+# ── Coverage requirements ─────────────────────────────────────
+coverage:
+  min_coverage: 0.30        # minimum fraction of grid cells that must be channels
+  target_coverage: [0.40, 0.70]  # target coverage range (informational)
+  subregion_cols: 12        # divide grid into 12 subregion columns
+  subregion_rows: 6         # divide grid into 6 subregion rows
+                            # each subregion = 5×5 cells for 60×30 grid
+
+# ── Manufacturing constraints ─────────────────────────────────
+manufacturing:
+  min_spacing: 2            # min cells between parallel channels (≈10mm wall)
+  max_consecutive_turns: 3  # max direction changes before requiring straight segment
+  channel_width_mm: 12      # channel width in mm (stored as edge feature)
+
+# ── Protection zone ───────────────────────────────────────────
+# Within this radius (Manhattan distance) of inlet/outlet:
+#   no branching, merging, or loop formation allowed.
+protection_radius: 4        # cells around inlet/outlet
+
+# ── Dead-end policy ───────────────────────────────────────────
+# If false, degree-1 nodes (other than inlet/outlet) are removed.
+allow_dead_ends: false
+
+# ── Loops ─────────────────────────────────────────────────────
+loops:
+  p_loop: 0.20              # higher value encourages mesh-like structures
+                            # (connectors inherently form loops; this controls
+                            #  extra loop probability during pruning)
+
+# ── Pipe width ───────────────────────────────────────────────
+# Visual thickness in grid cells (1 = single-cell pipe).
+# Values > 1 dilate the pipe mask for visualization only.
+pipe_width: 1
+
+# ── Batch generation ─────────────────────────────────────────
+num_samples: 10
+
+# Random seed.  Set to an integer for reproducibility; null = random.
+seed: null
+
+# ── Output ───────────────────────────────────────────────────
+output:
+  dir: output          # Root directory for generated files
+  save_grid: true      # Save grid.npy for each sample
+  save_graph: true     # Save graph.json for each sample
+  save_image: true     # Save preview.png for each sample
+  save_summary: true   # Save summary.png (thumbnail grid of all samples)
+
+# ── Visualization ────────────────────────────────────────────
+visualization:
+  dpi: 120
+  figsize: [10, 5]     # [width, height] in inches
+  # Colormaps / colours
+  color_empty: "#f5f5f5"
+  color_main: "#1f77b4"      # backbone cells
+  color_branch: "#ff7f0e"    # connector cells
+  color_inlet: "#2ca02c"     # inlet marker
+  color_outlet: "#d62728"    # outlet marker
+  color_protection: "#ffe0e0"  # protection zone shading
+  show_grid_lines: true
+  show_inlet_outlet: true
+  show_protection_zone: true   # shade protection zone in visualization
+  # Summary image
+  summary_cols: 5            # columns in the summary montage
+  summary_dpi: 80
+  summary_figsize: null      # null = auto-computed from num_samples

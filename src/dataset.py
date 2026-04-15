@@ -85,6 +85,29 @@ class PressureDropDataset(Dataset):
         # Load the label CSV
         self.labels_df = pd.read_csv(LABEL_CSV)
 
+                # 过滤掉没有对应 npy 文件的样本
+        valid_indices = []
+        missing_cases = []
+
+        for i, row in self.labels_df.iterrows():
+            case_id = row["ID"]
+            path = self._npy_path(case_id)
+
+            if os.path.exists(path):
+                valid_indices.append(i)
+            else:
+                missing_cases.append(case_id)
+
+        # 只保留有文件的样本
+        self.labels_df = self.labels_df.iloc[valid_indices].reset_index(drop=True)
+
+        print(f"  ✅ 有效样本数: {len(self.labels_df)}")
+        print(f"  ⚠️ 缺失样本数: {len(missing_cases)}")
+
+        # 可选：打印前几个缺失的
+        if missing_cases:
+            print("  示例缺失 case:", missing_cases[:5])
+
         # Filter by split if requested
         if split is not None:
             self.labels_df = self.labels_df[
@@ -112,29 +135,30 @@ class PressureDropDataset(Dataset):
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
-
     def _npy_path(self, case_id: str) -> str:
-        """Return the full path to the topology .npy file for *case_id*.
-
-        First tries an exact match ``{case_id}_topo.npy``.  If not found,
-        falls back to a prefix match on the first ``-``-separated segment
-        (DOE prefix), which supports filenames where the full ID suffix
-        has been shortened.
         """
-        exact = os.path.join(DATA_DIR, f"{case_id}_topo.npy")
-        if os.path.exists(exact):
-            return exact
+        模糊匹配 npy 文件：
+        只要文件名中包含 DOE编号（如 DOE001）即可匹配
+        """
+        import re
 
-        # Fuzzy match: try matching on the DOE prefix (segment before first '-')
-        prefix = case_id.split("-")[0]
+        # 1️⃣ 提取 DOE编号
+        match = re.search(r"(DOE\d+)", case_id)
+        if match:
+            doe_id = match.group(1)
+        else:
+            doe_id = case_id
+
+        # 2️⃣ 遍历文件夹查找匹配文件
         try:
             for fname in os.listdir(DATA_DIR):
-                if fname.startswith(prefix) and fname.endswith("_topo.npy"):
+                if fname.endswith(".npy") and doe_id in fname:
                     return os.path.join(DATA_DIR, fname)
         except OSError:
             pass
 
-        return exact  # Return exact path even if missing (caller handles error)
+        # 3️⃣ fallback（用于报错）
+        return os.path.join(DATA_DIR, f"{case_id}.npy")
 
     def _load_npy(self, case_id: str) -> dict:
         """Load and return the topology dictionary for *case_id*."""

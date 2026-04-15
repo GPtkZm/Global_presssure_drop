@@ -23,11 +23,18 @@ from src.config import (
     TRANSFORMER_NHEAD,
     TRANSFORMER_NUM_ENCODER_LAYERS,
     TRANSFORMER_POOL,
+    GPS_ATTN_DROPOUT,
+    GPS_DIM_FEEDFORWARD,
+    GPS_DROPOUT,
+    GPS_HIDDEN_DIM,
+    GPS_NHEAD,
+    GPS_NUM_LAYERS,
 )
 from src.models.heterognn import HeteroGNN
 from src.models.transformer import TransformerPressureDrop
+from src.models.graphgps import GraphGPSPressureDrop
 
-__all__ = ["HeteroGNN", "TransformerPressureDrop", "build_model"]
+__all__ = ["HeteroGNN", "TransformerPressureDrop", "GraphGPSPressureDrop", "build_model"]
 
 
 def build_model(cfg: dict) -> "torch.nn.Module":
@@ -37,7 +44,7 @@ def build_model(cfg: dict) -> "torch.nn.Module":
     ----------
     cfg : dict
         Must contain keys:
-          - ``model_type``        : ``"heterognn"`` or ``"transformer"``
+          - ``model_type``        : ``"heterognn"``, ``"transformer"``, or ``"graphgps"``
           - ``point_in_dim``      : int
           - ``face_in_dim``       : int
           - ``edge_in_dim``       : int
@@ -91,7 +98,22 @@ def build_model(cfg: dict) -> "torch.nn.Module":
             global_mlp_dim=cfg.get("global_mlp_dim", GLOBAL_MLP_DIM),
         )
 
+    if model_type == "graphgps":
+        return GraphGPSPressureDrop(
+            point_in_dim=point_in_dim,
+            face_in_dim=face_in_dim,
+            edge_in_dim=edge_in_dim,
+            global_feature_dim=global_feature_dim,
+            hidden_dim=cfg.get("hidden_dim", GPS_HIDDEN_DIM),
+            num_layers=cfg.get("num_layers", GPS_NUM_LAYERS),
+            nhead=cfg.get("gps_nhead", GPS_NHEAD),
+            dim_feedforward=cfg.get("gps_dim_feedforward", GPS_DIM_FEEDFORWARD),
+            dropout=cfg.get("dropout", GPS_DROPOUT),
+            attn_dropout=cfg.get("gps_attn_dropout", GPS_ATTN_DROPOUT),
+            global_mlp_dim=cfg.get("global_mlp_dim", GLOBAL_MLP_DIM),
+        )
+
     raise ValueError(
         f"Unknown model_type '{model_type}'. "
-        f"Supported types: 'heterognn', 'transformer'."
+        f"Supported types: 'heterognn', 'transformer', 'graphgps'."
     )

@@ -18,7 +18,7 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(ROOT_DIR, "data", "topo")
 
 # CSV file with case IDs, splits, and the pressure-drop label
-LABEL_CSV = os.path.join(ROOT_DIR, "data", "labels.csv")
+LABEL_CSV = os.path.join(ROOT_DIR, "data", "data_information793.csv")
 
 # Directory where model checkpoints and normalisation stats are saved
 CHECKPOINT_DIR = os.path.join(ROOT_DIR, "checkpoints")
@@ -29,7 +29,7 @@ RESULTS_DIR = os.path.join(ROOT_DIR, "results")
 # ---------------------------------------------------------------------------
 # Model selection
 # ---------------------------------------------------------------------------
-# Choose which model to use: "heterognn" or "transformer"
+# Choose which model to use: "heterognn", "transformer", or "graphgps"
 MODEL_TYPE = "heterognn"
 
 # ---------------------------------------------------------------------------
@@ -50,11 +50,21 @@ TRANSFORMER_DROPOUT = 0.1      # Dropout in transformer
 TRANSFORMER_POOL = "mean"      # Pooling strategy: "mean" or "max"
 
 # ---------------------------------------------------------------------------
+# Model hyperparameters — GraphGPS
+# ---------------------------------------------------------------------------
+GPS_HIDDEN_DIM = 128           # Unified hidden dimension for all node types
+GPS_NUM_LAYERS = 6             # Number of GPS layers (Local MPNN + Global Attn)
+GPS_NHEAD = 8                  # Number of attention heads in global branch
+GPS_DIM_FEEDFORWARD = 512      # FFN intermediate width inside GPS layers
+GPS_DROPOUT = 0.1              # Dropout in FFN and residual paths
+GPS_ATTN_DROPOUT = 0.1         # Dropout on attention weights
+
+# ---------------------------------------------------------------------------
 # Training hyperparameters
 # ---------------------------------------------------------------------------
 LR = 1e-3              # Initial learning rate for Adam
 EPOCHS = 300           # Maximum number of training epochs
-BATCH_SIZE = 16        # Number of graphs per mini-batch
+BATCH_SIZE = 2        # Number of graphs per mini-batch
 PATIENCE = 30          # Early-stopping patience (epochs without test improvement)
 SEED = 42              # Global random seed for reproducibility
 
